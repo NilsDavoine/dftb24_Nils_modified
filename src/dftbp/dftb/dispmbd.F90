@@ -483,7 +483,7 @@ contains
 
     real(dp), intent(in) :: DFTBMBDforces(:,:)
     integer :: nAtom, iAtom, j
-    integer :: fIDdftb
+    integer :: fIDdftbmbd
 
     nAtom = size(DFTBMBDforces, 1)
     open(unit=fIDdftbmbd, file="DFTBMBD_forces.out", action="write", status="replace", position="rewind")
