@@ -13,7 +13,7 @@ module dftbp_dftb_dispmbd
   use dftbp_common_accuracy, only: dp, mc, lc
   use dftbp_common_constants, only: symbolToNumber
   use dftbp_common_environment, only: TEnvironment
-  use dftbp_common_globalenv, only: stdOut
+  use dftbp_common_globalenv, only: stdOut, tIoProc
   use dftbp_common_status, only : TStatus
   use dftbp_dftb_dispiface, only: TDispersionIface
   use dftbp_dftb_periodic, only: TNeighbourList
@@ -270,11 +270,20 @@ contains
       return
     end if
 
+    !> Save the DFTB forces
+    call writeDFTBforces(gradients)
+
     if (.not. this%gradientsUpdated) then
       call this%calculator%get_gradients(this%gradients)
       this%gradientsUpdated = .true.
     end if
     gradients(:,:) = gradients + this%gradients
+
+    !> Save the MBD forces
+    call writeMBDforces(this%gradients)
+
+    !> Save the DFTBMBD forces
+    call writeDFTBMBDforces(gradients)
 
     if (present(stat)) stat = 0
 
@@ -321,7 +330,7 @@ contains
 
 
   !> Update charges in the MBD model
-  subroutine updateOnsiteCharges(this, qNetAtom, orb, referenceN0, species0, tCanUseCharges)
+  subroutine updateOnsiteCharges(this, qNetAtom, orb, referenceN0, species0, tCanUseCharges,  tWriteCharges)
 
     !> Instance
     class(TDispMbd), intent(inout) :: this
@@ -341,6 +350,9 @@ contains
     !> Are these charges from a converged SCC calculation/are suitable to evaluate MBD from
     !> (i.e. non-converged but can be used)
     logical, intent(in) :: tCanUseCharges
+    
+    !> Should CPA ratios be printed?
+    logical, intent(in) :: tWriteCharges
 
     real(dp), allocatable :: cpa(:), free_charges(:)
     integer :: nAtom, i_atom, i_spec
@@ -367,6 +379,9 @@ contains
 
       ! charges have been updated though, so are available for property evaluations
       this%chargesUpdated = .true.
+      if (tIoProc .and. tWriteCharges) then
+        call writeCPAratios(cpa)
+      endif
     else
       this%chargesUpdated = .false.
     end if
@@ -412,6 +427,72 @@ contains
     write(stdOut, "(A,A)") '* Libmbd: ', str
 
   end subroutine mbdPrinter
+  
+    !> Write CPA output
+  subroutine writeCPAratios(cpa)
 
+    real(dp), intent(in) :: cpa(:)
+    integer :: nAtom, iAtom, fIDcpa
+
+    nAtom = size(cpa)
+    open(fIDcpa, file="CPA_ratios.out", action="write", status="replace", position="rewind")
+    write(fIDcpa,*) "       iAtom       CPA ratio"
+    do iAtom=1, nAtom
+        write(fIDcpa,*) iAtom, '  ', cpa(iAtom)
+    enddo
+    close(fIDcpa)
+
+  end subroutine writeCPAratios
+
+  !> Write MBD forces output
+  subroutine writeMBDforces(MBDforces)
+
+    real(dp), intent(in) :: MBDforces(:,:)
+    integer :: nAtom, iAtom, j
+    integer :: fIDmbd
+
+    nAtom = size(MBDforces, 1)
+    open(unit=fIDmbd, file="MBD_forces.out", action="write", status="replace", position="rewind")
+    write(fIDmbd,*) "       iAtom       MBD Forces"
+    do iAtom = 1, nAtom
+        write(fIDmbd, '(I8, 3(F12.6))') iAtom, (MBDforces(iAtom, j), j = 1, 3)
+    end do
+    close(fIDmbd)
+
+  end subroutine writeMBDforces
+
+  !> Write DFTB forces output
+  subroutine writeDFTBforces(DFTBforces)
+
+    real(dp), intent(in) :: DFTBforces(:,:)
+    integer :: nAtom, iAtom, j
+    integer :: fIDdftb
+
+    nAtom = size(DFTBforces, 1)
+    open(unit=fIDdftb, file="DFTB_forces.out", action="write", status="replace", position="rewind")
+    write(fIDdftb,*) "       iAtom       DFTB Forces"
+    do iAtom = 1, nAtom
+        write(fIDdftb, '(I8, 3(F12.6))') iAtom, (DFTBforces(iAtom, j), j = 1, 3)
+    end do
+    close(fIDdftb)
+
+  end subroutine writeDFTBforces
+
+  !> Write DFTBMBD forces output
+  subroutine writeDFTBMBDforces(DFTBMBDforces)
+
+    real(dp), intent(in) :: DFTBMBDforces(:,:)
+    integer :: nAtom, iAtom, j
+    integer :: fIDdftb
+
+    nAtom = size(DFTBMBDforces, 1)
+    open(unit=fIDdftbmbd, file="DFTBMBD_forces.out", action="write", status="replace", position="rewind")
+    write(fIDdftbmbd,*) "       iAtom       DFTBMBD Forces"
+    do iAtom = 1, nAtom
+        write(fIDdftbmbd, '(I8, 3(F12.6))') iAtom, (DFTBMBDforces(iAtom, j), j = 1, 3)
+    end do
+    close(fIDdftbmbd)
+
+  end subroutine writeDFTBMBDforces
 
 end module dftbp_dftb_dispmbd
