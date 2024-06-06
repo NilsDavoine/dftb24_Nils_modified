@@ -428,7 +428,7 @@ contains
 
   end subroutine mbdPrinter
   
-    !> Write CPA output
+  !> Write CPA output
   subroutine writeCPAratios(cpa)
 
     real(dp), intent(in) :: cpa(:)
